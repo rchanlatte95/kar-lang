@@ -1,2 +1,10 @@
 ﻿  rac.cpp
-  rac.vcxproj -> C:\Users\Ryan Chanlatte\Desktop\_Git\rac\x64\Debug\rac.exe
+C:\Users\Ryan\Desktop\dev\kar-lang\rac\rac.cpp(463,38): warning C4244: '=': conversion from 'i32' to 'mut_f32', possible loss of data
+C:\Users\Ryan\Desktop\dev\kar-lang\rac\rac.cpp(463,46): warning C4244: '=': conversion from 'i32' to 'mut_f32', possible loss of data
+C:\Users\Ryan\Desktop\dev\kar-lang\rac\rac.cpp(464,38): warning C4244: '=': conversion from 'i64' to 'mut_f32', possible loss of data
+C:\Users\Ryan\Desktop\dev\kar-lang\rac\rac.cpp(464,46): warning C4244: '=': conversion from 'i64' to 'mut_f32', possible loss of data
+C:\Users\Ryan\Desktop\dev\kar-lang\rac\rac.cpp(467,29): warning C4244: '=': conversion from 'i32' to 'mut_f32', possible loss of data
+C:\Users\Ryan\Desktop\dev\kar-lang\rac\rac.cpp(467,36): warning C4244: '=': conversion from 'i32' to 'mut_f32', possible loss of data
+C:\Users\Ryan\Desktop\dev\kar-lang\rac\rac.cpp(468,29): warning C4244: '=': conversion from 'i64' to 'mut_f32', possible loss of data
+C:\Users\Ryan\Desktop\dev\kar-lang\rac\rac.cpp(468,36): warning C4244: '=': conversion from 'i64' to 'mut_f32', possible loss of data
+  rac.vcxproj -> C:\Users\Ryan\Desktop\dev\kar-lang\rac\x64\Debug\rac.exe

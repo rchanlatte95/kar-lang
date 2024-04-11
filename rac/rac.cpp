@@ -1,5 +1,9 @@
 #include <iostream>
 #include <limits>
+#include <vector>
+#include <math.h>
+#include <float.h>
+#include <stdio.h>
 
 #ifndef RAC
 #define RAC
@@ -22,10 +26,13 @@ typedef int32_t mut_i32;    typedef uint32_t mut_u32;
 typedef const int64_t i64;  typedef const uint64_t u64;
 typedef int64_t mut_i64;    typedef uint64_t mut_u64;
 
+typedef const float f32;    typedef const float& f32_ref;   typedef float mut_f32;
+typedef const double f64;   typedef const double& f64_ref;        typedef double mut_f64;
+
 typedef const uint8_t* utf8ptr; typedef const wchar_t* utf16ptr;
 typedef uint8_t* mut_utf8ptr;   typedef wchar_t* mut_utf16ptr;
 
-typedef void* mut_voidptr;      typedef const mut_voidptr voidptr;
+typedef void* mut_ptr;      typedef const void* ptr;
 
 typedef const int8_t* i8ptr;    typedef int8_t* mut_i8ptr;
 typedef const uint8_t* u8ptr;   typedef uint8_t* mut_u8ptr;
@@ -39,6 +46,9 @@ typedef const uint32_t* u32ptr; typedef uint32_t* mut_u32ptr;
 typedef const int64_t* i64ptr;  typedef int64_t* mut_i64ptr;
 typedef const uint64_t* u64ptr; typedef uint64_t* mut_u64ptr;
 
+typedef const float* f32ptr;  typedef int32_t* mut_f32ptr;
+typedef const double* f64ptr; typedef uint32_t* mut_f64ptr;
+
 namespace rac
 {
     const u64 BYTES_IN_KB = 1024;
@@ -47,13 +57,6 @@ namespace rac
 
     const u64 X86_STACK_BYTE_SIZE = BYTES_IN_MB;
     const u64 X64_STACK_BYTE_SIZE = BYTES_IN_MB * 4;
-
-    static constexpr u32 clamp(u32 x, u32 min, u32 max)
-    {
-        if (x > max) return max;
-        if (x < min) return min;
-        return x;
-    }
 
     namespace logic
     {
@@ -64,10 +67,14 @@ namespace rac
 
         public:
 
-            Bool() {}
+            Bool() { truth_value = false; }
             Bool(bool b) { truth_value = b; }
+            Bool(i8 i) { truth_value = i != 0; } Bool(u8 u) { truth_value = u != 0; }
+            Bool(i16 i) { truth_value = i != 0; } Bool(u16 u) { truth_value = u != 0; }
+            Bool(i32 i) { truth_value = i != 0; } Bool(u32 u) { truth_value = u != 0; }
+            Bool(i64 i) { truth_value = i != 0; } Bool(u64 u) { truth_value = u != 0; }
 
-            const char* Cstr() const
+            cstr Cstr() const
             {
                 return truth_value ? "true" : "false";
             }
@@ -129,7 +136,7 @@ namespace rac
 
     namespace stack_utf8_string
     {
-        const i32 SSTR_BASE_BYTE_SIZE = BYTES_IN_KB;
+        const i32 SSTR_BASE_BYTE_SIZE = BYTES_IN_KB / 2;
         const i32 SSTR_CAPACITY = SSTR_BASE_BYTE_SIZE - sizeof(i32);
         const i32 SSTR_MAX_LEN = SSTR_CAPACITY - 1;
 
@@ -158,7 +165,7 @@ namespace rac
                     c == NEXT_LINE || c == NO_BREAK_SPACE;
         }
 
-        static constexpr bool whitespace(const u8ptr c_ptr) { return  whitespace(*c_ptr); }
+        static constexpr bool whitespace(u8ptr c_ptr) { return  whitespace(*c_ptr); }
 
         class alignas(8) str;
         typedef const str* str_ptr;   typedef str* mut_str_ptr;
@@ -189,7 +196,7 @@ namespace rac
 
             str(cstr _str, i32 startIndex, i32 char_ct)
             {
-                const u32 start = clamp_len(startIndex);
+                i32 start = clamp_len(startIndex);
                 len = (i32)strnlen_s(&_str[start], clamp_len(char_ct));
                 chars[0] = 0;
                 chars[SSTR_MAX_LEN] = 0;
@@ -214,7 +221,7 @@ namespace rac
 
             str(str_ptr _str, i32 startIndex, i32 char_ct)
             {
-                const u32 start = clamp_len(startIndex);
+                i32 start = clamp_len(startIndex);
 
                 len = (i32)clamp_len(char_ct);
                 memcpy_s(chars, len, &_str->chars[start], len);
@@ -224,7 +231,7 @@ namespace rac
 
             str(str_ref _str, i32 startIndex, i32 char_ct)
             {
-                const u32 start = clamp_len(startIndex);
+                i32 start = clamp_len(startIndex);
 
                 len = (i32)clamp_len(char_ct);
                 memcpy_s(chars, len, &_str.chars[start], len);
@@ -232,13 +239,14 @@ namespace rac
                 chars[SSTR_MAX_LEN] = 0;
             }
 
+            INLINE i32 MaxLength() const { return SSTR_MAX_LEN; }
             INLINE i32 Length() const { return len; }
             INLINE utf8ptr Str() { return &chars[0]; }
             INLINE bool Empty() const { return len == 0; }
             INLINE void Clear() { len = 0; chars[0] = 0; }
-            INLINE u8& operator[](int index) { return chars[index]; }
+            INLINE u8& operator[](i32 index) { return chars[index]; }
 
-            INLINE str_ref operator=(const char* rhs)
+            INLINE str_ref operator=(cstr rhs)
             {
                 len = (i32)strnlen_s(rhs, SSTR_MAX_LEN);
                 chars[0] = 0;
@@ -250,6 +258,8 @@ namespace rac
             }
             INLINE str_ref operator=(str_ref rhs)
             {
+                if (*this == rhs) { return *this; }
+
                 len = rhs.len;
                 memcpy_s(chars, len, rhs.chars, len);
                 chars[len] = 0;
@@ -258,24 +268,24 @@ namespace rac
                 return *this;
             }
 
-            INLINE str_ref operator+=(const char* rhs)
+            INLINE str_ref operator+=(cstr rhs)
             {
-                const i32 rhs_len = (i32)strnlen_s(rhs, SSTR_MAX_LEN);
-                const i32 new_len = len + rhs_len;
+                i32 rhs_len = (i32)strnlen_s(rhs, SSTR_MAX_LEN);
+                i32 new_len = len + rhs_len;
                 if (len == SSTR_MAX_LEN || new_len >= SSTR_MAX_LEN)
                 {
                     return *this;
                 }
 
-                memcpy_s(this->chars + len, new_len, rhs, rhs_len);
-                this->len = new_len;
+                memcpy_s(chars + len, new_len, rhs, rhs_len);
+                len = new_len;
                 chars[len] = 0;
 
                 return *this;
             }
             INLINE str_ref operator+=(str_ref rhs)
             {
-                const i32 new_len = len + rhs.len;
+                i32 new_len = len + rhs.len;
                 if (len == SSTR_MAX_LEN || new_len >= SSTR_MAX_LEN)
                 {
                     return *this;
@@ -287,37 +297,37 @@ namespace rac
 
                 return *this;
             }
-            INLINE str_ref operator+=(const char c)
+            INLINE str_ref operator+=(u8 c)
             {
                 if (len == SSTR_MAX_LEN) return *this;
-                this->chars[len++] = c;
-                this->chars[len] = 0;
+                chars[len++] = c;
+                chars[len] = 0;
                 return *this;
             }
 
             INLINE bool operator>(str_ref rhs)
             {
-                return memcmp(voidptr(&this->len), voidptr(&rhs.len), this->len) > 0;
+                return memcmp(ptr(&len), ptr(&rhs.len), len) > 0;
             }
             INLINE bool operator>=(str_ref rhs)
             {
-                return memcmp(voidptr(&this->len), voidptr(&rhs.len), this->len) >= 0;
+                return memcmp(ptr(&len), ptr(&rhs.len), len) >= 0;
             }
             INLINE bool operator<(str_ref rhs)
             {
-                return memcmp(voidptr(&this->len), voidptr(&rhs.len), this->len) < 0;
+                return memcmp(ptr(&len), ptr(&rhs.len), len) < 0;
             }
             INLINE bool operator<=(str_ref rhs)
             {
-                return memcmp(voidptr(&this->len), voidptr(&rhs.len), this->len) <= 0;
+                return memcmp(ptr(&len), ptr(&rhs.len), len) <= 0;
             }
             INLINE bool operator==(str_ref rhs)
             {
-                return memcmp(voidptr(&this->len), voidptr(&rhs.len), this->len) == 0;
+                return memcmp(ptr(&len), ptr(&rhs.len), len) == 0;
             }
             INLINE bool operator!=(str_ref rhs)
             {
-                return memcmp(voidptr(&this->len), voidptr(&rhs.len), this->len) != 0;
+                return memcmp(ptr(&len), ptr(&rhs.len), len) != 0;
             }
 
             INLINE bool operator==(cstr rhs)
@@ -333,16 +343,17 @@ namespace rac
 
             INLINE logic::comp Compare(str_ref arg)
             {
-                return logic::comp(memcmp(voidptr(&this->len), voidptr(&arg.len), this->len));
+                return logic::comp(memcmp(ptr(&this->len), ptr(&arg.len), this->len));
             }
             INLINE logic::comp Compare(cstr c_str)
             {
-                return logic::comp(memcmp(voidptr(&this->chars[0]), voidptr(c_str), this->len));
+                return logic::comp(memcmp(ptr(&this->chars[0]), ptr(c_str), this->len));
             }
 
             INLINE cstr Cstr() const { return (cstr)(&chars[0]); }
             INLINE std::string StdStr() const { return std::string((cstr)chars, len); }
-            INLINE voidptr ToVoidptr() const { return (voidptr)(&len); }
+            INLINE ptr Ptr() const { return (ptr)(&len); }
+            INLINE str_ref Ref() const { return *this; }
 
             INLINE u8& First() { return chars[0]; }
             INLINE u8& Last() { return chars[len - 1]; }
@@ -425,33 +436,183 @@ namespace rac
         };
     }
 
-    namespace lists
+    namespace mth
     {
-        class singleLink;
-        typedef const singleLink* singleLink_ptr;
-        typedef const singleLink& singleLink_ref;
+        using namespace rac::stack_utf8_string;
 
-        const u64 NULL_LIST_ID = 0;
+        f32 FLOAT_EPSILON = 0.0001f;
+        f32 SIGNED_FLOAT_EPSILON = -FLOAT_EPSILON;
+        i32 FLT_STR_MAX = FLT_DECIMAL_DIG * 2 + 4;
+        i32 FLT_STR_LEN = FLT_STR_MAX - 1;
+        #define RAC_F32_APPROX(a, b) (fabsf(a - b) <= FLOAT_EPSILON)
+        #define RAC_F32_APPROX_MORE(a, b) (fabsf(a - b) > FLOAT_EPSILON)
+        #define RAC_F32_APPROX_LESS(a, b) (fabsf(a - b) < SIGNED_FLOAT_EPSILON)
 
-        class singleLink
+        class v2;
+        typedef const v2* v2_ptr;   typedef v2* mut_v2_ptr;
+        typedef const v2& v2_ref;   typedef v2& mut_v2_ref;
+
+        class v2
         {
-            u64 id = NULL_LIST_ID;
-            voidptr data = nullptr;
-            singleLink_ptr prev = nullptr;
-            singleLink_ptr next = nullptr;
+        public:
+            mut_f32 x = 0.0f;
+            mut_f32 y = 0.0f;
 
-            INLINE bool Head() const { return prev == nullptr && next != nullptr; }
-            INLINE bool End() const { return prev != nullptr && next == nullptr; }
+            v2(i8 _x, i8 _y) { x = _x; y = _y; }
+            v2(i16 _x, i16 _y) { x = _x; y = _y; }
+            v2(i32 _x, i32 _y) { x = _x; y = _y; }
+            v2(i64 _x, i64 _y) { x = _x; y = _y; }
+            v2(i8 a) { x = a; y = a; }
+            v2(i16 a) { x = a; y = a; }
+            v2(i32 a) { x = a; y = a; }
+            v2(i64 a) { x = a; y = a; }
+
+            v2(f32 _x, f32 _y) { x = _x; y = _y; }
+            v2(f32 a) { x = a; y = a; }
+            v2() { }
+
+            INLINE v2_ref operator=(v2_ref rhs)
+            {
+                x = rhs.x;
+                y = rhs.y;
+            }
+            INLINE v2_ref operator +=(v2_ref rhs)
+            {
+                x += rhs.x;
+                y += rhs.y;
+            }
+            INLINE v2_ref operator -=(v2_ref rhs)
+            {
+                x -= rhs.x;
+                y -= rhs.y;
+            }
+            INLINE v2_ref operator *=(v2_ref rhs)
+            {
+                x *= rhs.x;
+                y *= rhs.y;
+            }
+            INLINE v2_ref operator *=(f32 a)
+            {
+                x *= a;
+                y *= a;
+            }
+            INLINE v2_ref operator /=(v2_ref rhs)
+            {
+                x /= rhs.x;
+                y /= rhs.y;
+            }
+            INLINE v2_ref operator /=(f32 a)
+            {
+                x /= a;
+                y /= a;
+            }
+
+            INLINE ptr Ptr() const { return (ptr)(&x); }
+            INLINE v2_ref Ref() const { return *this; }
+
+            INLINE str_ref Str(mut_str_ref str) const
+            {
+                char buff[FLT_STR_MAX] = { 0 };
+                sprintf_s(buff, "(%0.4f, %0.4f)", x, y);
+                str = buff;
+                return str;
+            }
+
+            INLINE v2_ref Clamp(f32 x_min, f32 x_max, f32 y_min, f32 y_max)
+            {
+                x = x > x_max ? x_max : (x < x_min ? x_min : x);
+                y = y > y_max ? y_max : (y < y_min ? y_min : y);
+            }
+            INLINE v2_ref Clamp(v2 min, v2 max)
+            {
+                x = x > max.x ? max.x : (x < min.x ? min.x : x);
+                y = y > max.y ? max.y : (y < min.y ? min.y : y);
+            }
         };
+
+        INLINE static bool operator >(v2_ref lhs, v2_ref rhs)
+        {
+            return  RAC_F32_APPROX_MORE(lhs.x, rhs.x) &&
+                    RAC_F32_APPROX_MORE(lhs.y, rhs.y);
+        }
+        INLINE static bool operator <(v2_ref lhs, v2_ref rhs)
+        {
+            return lhs > rhs;
+        }
+        INLINE static bool operator <=(v2_ref lhs, v2_ref rhs)
+        {
+            return !(lhs > rhs);
+        }
+        INLINE static bool operator >=(v2_ref lhs, v2_ref rhs)
+        {
+            return !(lhs < rhs);
+        }
+        INLINE static bool operator ==(v2_ref lhs, v2_ref rhs)
+        {
+            return RAC_F32_APPROX(lhs.x, rhs.x) && RAC_F32_APPROX(lhs.y, rhs.y);
+        }
+        INLINE static bool operator !=(v2_ref lhs, v2_ref rhs)
+        {
+            return !(lhs == rhs);
+        }
+
+        INLINE static v2 operator +(v2_ref lhs, v2_ref rhs)
+        {
+            return v2(lhs.x + rhs.x, lhs.y + rhs.y);
+        }
+        INLINE static v2 operator -(v2_ref lhs, v2_ref rhs)
+        {
+            return v2(lhs.x - rhs.x, lhs.y - rhs.y);
+        }
+        INLINE static v2 operator *(v2_ref lhs, v2_ref rhs)
+        {
+            return v2(lhs.x * rhs.x, lhs.y * rhs.y);
+        }
+        INLINE static v2 operator /(v2_ref lhs, v2_ref rhs)
+        {
+            return v2(lhs.x / rhs.x, lhs.y / rhs.y);
+        }
+    }
+
+    namespace collections
+    {
+        namespace lists
+        {
+            class singleLink;
+            typedef const singleLink* singleLink_ptr;
+            typedef const singleLink& singleLink_ref;
+
+            const u64 NULL_LIST_ID = 0;
+
+            class singleLink
+            {
+                u64 id = NULL_LIST_ID;
+                ptr data = nullptr;
+                singleLink_ptr prev = nullptr;
+                singleLink_ptr next = nullptr;
+
+                INLINE bool Invalid() const {
+                    return    id == NULL_LIST_ID &&
+                        data == nullptr &&
+                        prev == nullptr &&
+                        next == nullptr;
+                }
+
+                INLINE bool Head() const { return prev == nullptr && next != nullptr; }
+                INLINE bool End() const { return prev != nullptr && next == nullptr; }
+            };
+        }
     }
 }
 
 #endif
 
-int main()
+static void test_str()
 {
+    using namespace std;
     using namespace rac::stack_utf8_string;
     using namespace rac::logic;
+
     str stack_str_0 = str();
 
     std::cout << "sizeof(sstr) = " << sizeof(str) << " bytes\r\n" << std::endl;
@@ -475,4 +636,15 @@ int main()
     str stack_str_3 = str("     \r\n\t     test     \r\n\t");
     std::cout << "Before trim(): => |" << stack_str_3.Cstr() << "|" << std::endl;
     std::cout << "\r\nAfter trim(): => |" << stack_str_3.TrimStart().Cstr() << "|" << std::endl;
+}
+
+int main()
+{
+    using namespace std;
+    using namespace rac::stack_utf8_string;
+    using namespace rac::mth;
+
+    str testStr;
+    v2 test(1.0f, 2.0f);
+    cout << test.Str(testStr).Cstr() << endl;
 }
