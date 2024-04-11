@@ -1,9 +1,10 @@
-#include <iostream>
+#pragma warning(push, 0)// Prevent warnings from libraries I can't fix.
 #include <limits>
 #include <vector>
 #include <math.h>
 #include <float.h>
 #include <stdio.h>
+#pragma warning(pop)
 
 #ifndef RAC
 #define RAC
@@ -134,9 +135,9 @@ namespace rac
         };
     }
 
-    namespace stack_utf8_string
+    namespace string
     {
-        const i32 SSTR_BASE_BYTE_SIZE = BYTES_IN_KB / 2;
+        const i32 SSTR_BASE_BYTE_SIZE = BYTES_IN_KB / 8;
         const i32 SSTR_CAPACITY = SSTR_BASE_BYTE_SIZE - sizeof(i32);
         const i32 SSTR_MAX_LEN = SSTR_CAPACITY - 1;
 
@@ -191,7 +192,10 @@ namespace rac
                 chars[0] = 0;
                 chars[SSTR_MAX_LEN] = 0;
                 memcpy_s(chars, SSTR_MAX_LEN, _str, len);
+
+#pragma warning( disable : 6386) // Erroneous Buffer overrun warning
                 chars[len] = 0;
+#pragma warning( default : 6386)
             }
 
             str(cstr _str, i32 startIndex, i32 char_ct)
@@ -239,20 +243,29 @@ namespace rac
                 chars[SSTR_MAX_LEN] = 0;
             }
 
+            operator cstr() const { return (cstr)chars; }
+
             INLINE i32 MaxLength() const { return SSTR_MAX_LEN; }
             INLINE i32 Length() const { return len; }
             INLINE utf8ptr Str() { return &chars[0]; }
             INLINE bool Empty() const { return len == 0; }
             INLINE void Clear() { len = 0; chars[0] = 0; }
+            INLINE void Fill(u8 c, i32 ct = SSTR_MAX_LEN)
+            {
+                len = ct;
+                memset(chars, c, len);
+            }
             INLINE u8& operator[](i32 index) { return chars[index]; }
-
             INLINE str_ref operator=(cstr rhs)
             {
                 len = (i32)strnlen_s(rhs, SSTR_MAX_LEN);
                 chars[0] = 0;
                 chars[SSTR_MAX_LEN] = 0;
                 memcpy_s(chars, SSTR_MAX_LEN, rhs, len);
+
+#pragma warning( disable : 6386) // Erroneous Buffer overrun warning
                 chars[len] = 0;
+#pragma warning( default : 6386)
 
                 return *this;
             }
@@ -323,22 +336,28 @@ namespace rac
             }
             INLINE bool operator==(str_ref rhs)
             {
-                return memcmp(ptr(&len), ptr(&rhs.len), len) == 0;
+                return memcmp(&len, rhs.ToRef(), len) == 0;
             }
             INLINE bool operator!=(str_ref rhs)
             {
-                return memcmp(ptr(&len), ptr(&rhs.len), len) != 0;
+                return memcmp(&len, rhs.ToRef(), len) != 0;
             }
 
             INLINE bool operator==(cstr rhs)
             {
-                const i32 rhs_len = (i32)strnlen_s(rhs, SSTR_MAX_LEN);
-                return rhs_len == this->len && memcmp(this->chars, rhs, rhs_len) == 0;
+                i32 rhs_len = (i32)strnlen_s(rhs, SSTR_MAX_LEN);
+
+#pragma warning( disable : 6385) // Erroneous invalid data read warning
+                return rhs_len == len && memcmp(chars, rhs, rhs_len) == 0;
+#pragma warning( default : 6385)
             }
             INLINE bool operator!=(cstr rhs)
             {
-                const i32 rhs_len = (i32)strnlen_s(rhs, SSTR_MAX_LEN);
-                return rhs_len != this->len || memcmp(this->chars, rhs, rhs_len) != 0;
+                i32 rhs_len = (i32)strnlen_s(rhs, SSTR_MAX_LEN);
+
+#pragma warning( disable : 6385) // Erroneous invalid data read warning
+                return rhs_len == len && memcmp(chars, rhs, rhs_len) != 0;
+#pragma warning( default : 6385)
             }
 
             INLINE logic::comp Compare(str_ref arg)
@@ -350,10 +369,9 @@ namespace rac
                 return logic::comp(memcmp(ptr(&this->chars[0]), ptr(c_str), this->len));
             }
 
-            INLINE cstr Cstr() const { return (cstr)(&chars[0]); }
-            INLINE std::string StdStr() const { return std::string((cstr)chars, len); }
-            INLINE ptr Ptr() const { return (ptr)(&len); }
-            INLINE str_ref Ref() const { return *this; }
+            INLINE cstr ToCstr() const { return (cstr)(&chars[0]); }
+            INLINE ptr ToPtr() const { return (ptr)(&len); }
+            INLINE str_ref ToRef() const { return *this; }
 
             INLINE u8& First() { return chars[0]; }
             INLINE u8& Last() { return chars[len - 1]; }
@@ -389,8 +407,6 @@ namespace rac
                 if (len < 1) return *this;
 
                 u8ptr start = chars - 1;
-
-                const u8ptr fxd_end = chars + len - 1;
                 u8ptr end = chars + len - 1;
 
                 while (whitespace(++start));
@@ -422,6 +438,14 @@ namespace rac
 
                 return -1;
             }
+            INLINE bool Contains(u8 target) const
+            {
+                return IndexOf(target) > 0;
+            }
+            INLINE bool Contains(u8 target, i32 startIndex) const
+            {
+                return IndexOf(target, startIndex) > 0;
+            }
             INLINE bool EmptyOrWhitespace() const
             {
                 if (len < 1) return true;
@@ -434,19 +458,33 @@ namespace rac
                 return true;
             }
         };
+
+        INLINE static str operator +(cstr lhs, str_ref rhs)
+        {
+            str res(lhs);
+            res += rhs;
+            return res;
+        }
+
+        INLINE static str operator +(str_ref lhs, str_ref rhs)
+        {
+            str res(lhs);
+            res += rhs;
+            return res;
+        }
     }
 
     namespace mth
     {
-        using namespace rac::stack_utf8_string;
+        using namespace rac::string;
 
-        f32 FLOAT_EPSILON = 0.0001f;
-        f32 SIGNED_FLOAT_EPSILON = -FLOAT_EPSILON;
-        i32 FLT_STR_MAX = FLT_DECIMAL_DIG * 2 + 4;
-        i32 FLT_STR_LEN = FLT_STR_MAX - 1;
-        #define RAC_F32_APPROX(a, b) (fabsf(a - b) <= FLOAT_EPSILON)
-        #define RAC_F32_APPROX_MORE(a, b) (fabsf(a - b) > FLOAT_EPSILON)
-        #define RAC_F32_APPROX_LESS(a, b) (fabsf(a - b) < SIGNED_FLOAT_EPSILON)
+        f32 F32_EPSILON = 0.0001f;
+        f32 SIGNED_F32_EPSILON = -F32_EPSILON;
+        i32 F32_STR_MAX = FLT_DECIMAL_DIG * 2 + 4;
+        i32 F32_STR_LEN = F32_STR_MAX - 1;
+        #define RAC_F32_APPROX(a, b) (fabsf(a - b) <= F32_EPSILON)
+        #define RAC_F32_APPROX_MORE(a, b) (fabsf(a - b) > F32_EPSILON)
+        #define RAC_F32_APPROX_LESS(a, b) (fabsf(a - b) < SIGNED_F32_EPSILON)
 
         class v2;
         typedef const v2* v2_ptr;   typedef v2* mut_v2_ptr;
@@ -458,14 +496,10 @@ namespace rac
             mut_f32 x = 0.0f;
             mut_f32 y = 0.0f;
 
-            v2(i8 _x, i8 _y) { x = _x; y = _y; }
-            v2(i16 _x, i16 _y) { x = _x; y = _y; }
-            v2(i32 _x, i32 _y) { x = _x; y = _y; }
-            v2(i64 _x, i64 _y) { x = _x; y = _y; }
-            v2(i8 a) { x = a; y = a; }
-            v2(i16 a) { x = a; y = a; }
-            v2(i32 a) { x = a; y = a; }
-            v2(i64 a) { x = a; y = a; }
+            v2(i32 _x, i32 _y) { x = (mut_f32)_x; y = (mut_f32)_y; }
+            v2(i64 _x, i64 _y) { x = (mut_f32)_x; y = (mut_f32)_y; }
+            v2(i32 a) { x = (mut_f32)a; y = (mut_f32)a; }
+            v2(i64 a) { x = (mut_f32)a; y = (mut_f32)a; }
 
             v2(f32 _x, f32 _y) { x = _x; y = _y; }
             v2(f32 a) { x = a; y = a; }
@@ -510,9 +544,9 @@ namespace rac
             INLINE ptr Ptr() const { return (ptr)(&x); }
             INLINE v2_ref Ref() const { return *this; }
 
-            INLINE str_ref Str(mut_str_ref str) const
+            INLINE str_ref ToStr(mut_str_ref str) const
             {
-                char buff[FLT_STR_MAX] = { 0 };
+                char buff[F32_STR_MAX] = { 0 };
                 sprintf_s(buff, "(%0.4f, %0.4f)", x, y);
                 str = buff;
                 return str;
@@ -603,48 +637,60 @@ namespace rac
             };
         }
     }
+
+    namespace io
+    {
+        using namespace rac::string;
+
+        static INLINE int Print(str_ref s) { return printf("%s", s.ToCstr()); }
+        static INLINE int Println(str_ref s)
+        {
+            return printf("%s\r\n", s.ToCstr());
+        }
+
+        static INLINE int Print(char c) { return printf(&c); }
+        static INLINE int Println(char c) { return printf("%c\r\n", c); }
+    }
 }
 
 #endif
 
+/*
 static void test_str()
 {
     using namespace std;
     using namespace rac::stack_utf8_string;
     using namespace rac::logic;
 
-    str stack_str_0 = str();
+    printf("sizeof(sstr) = %i bytes\r\n", (i32)sizeof(str));
 
-    std::cout << "sizeof(sstr) = " << sizeof(str) << " bytes\r\n" << std::endl;
-
-    stack_str_0 = "Hello World!";
+    str stack_str_0 = str("Hello World!");
     str stack_str_1 = str(stack_str_0, 0, 5);
     stack_str_1 += " World!";
-    std::cout << "stack_str_0 := " << stack_str_0.StdStr() << std::endl;
-    std::cout << "stack_str_1 := " << stack_str_1.Cstr() << std::endl;
+    printf("stack_str_0 : = %s\r\n", stack_str_1.ToCstr());
 
-    std::cout << "\r\nstack_str_0 == stack_str_1 => " << Bool(stack_str_0 == stack_str_1).Cstr() << std::endl;
-    std::cout << "\r\nstack_str_0 == \"Hello World!\" => " << Bool(stack_str_0 == "Hello World!").Cstr() << std::endl;
+    printf("\r\nstack_str_0 == stack_str_1 => %s\r\n", Bool(stack_str_0 == stack_str_1).Cstr());
+    printf("\r\nstack_str_0 == \"Hello World!\" => %s\r\n", Bool(stack_str_0 == "Hello World!").Cstr());
 
     comp comparisonResult = stack_str_0.Compare(stack_str_1);
-    std::cout << "stack_str_0.Compare(stack_str_1) => " << comparisonResult.Cstr() << std::endl;
-
-    comparisonResult = stack_str_0.Compare("testing");
-    std::cout << "stack_str_0.Compare(\"testing\") => " << comparisonResult.Cstr() << std::endl;
-    std::cout << "\r\n\r\n-----\r\n" << std::endl;
+    printf("stack_str_0.Compare(stack_str_1) => %s\r\n", comparisonResult.Cstr());
+    printf("\r\n\r\n-----\r\n");
 
     str stack_str_3 = str("     \r\n\t     test     \r\n\t");
-    std::cout << "Before trim(): => |" << stack_str_3.Cstr() << "|" << std::endl;
-    std::cout << "\r\nAfter trim(): => |" << stack_str_3.TrimStart().Cstr() << "|" << std::endl;
+    printf("Before trim(): => |%s|\r\n", stack_str_3.ToCstr());
+    printf("After trim(): => |%s|\r\n", stack_str_3.TrimStart().ToCstr());
 }
+*/
 
 int main()
 {
-    using namespace std;
-    using namespace rac::stack_utf8_string;
+    using namespace rac::string;
     using namespace rac::mth;
+    using namespace rac::io;
 
     str testStr;
     v2 test(1.0f, 2.0f);
-    cout << test.Str(testStr).Cstr() << endl;
+    test.ToStr(testStr);
+
+    Println("v2 test = " + testStr);
 }

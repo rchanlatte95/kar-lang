@@ -1,9 +1,9 @@
 {
   "Version": 1,
-  "WorkspaceRootPath": "C:\\Users\\Ryan\\Desktop\\dev\\kar-lang\\rac\\",
+  "WorkspaceRootPath": "C:\\Users\\Ryan Chanlatte\\Desktop\\_Git\\_pako\\kar-lang\\rac\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{E6D12F4D-C323-4AAF-961D-CFD45D15B168}|rac.vcxproj|C:\\Users\\Ryan\\Desktop\\dev\\kar-lang\\rac\\rac.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "AbsoluteMoniker": "D:0:0:{E6D12F4D-C323-4AAF-961D-CFD45D15B168}|rac.vcxproj|C:\\Users\\Ryan Chanlatte\\Desktop\\_Git\\_pako\\kar-lang\\rac\\rac.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
       "RelativeMoniker": "D:0:0:{E6D12F4D-C323-4AAF-961D-CFD45D15B168}|rac.vcxproj|solutionrelative:rac.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     }
   ],
@@ -14,20 +14,74 @@
       "DocumentGroups": [
         {
           "DockedWidth": 256,
-          "SelectedChildIndex": 0,
+          "SelectedChildIndex": 6,
           "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:129:0:{1fc202d4-d401-403c-9834-5b218574bb67}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:1:0:{e8b06f52-6d01-11d2-aa7d-00c04f990343}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:129:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:130:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:128:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
+            },
             {
               "$type": "Document",
               "DocumentIndex": 0,
               "Title": "rac.cpp",
-              "DocumentMoniker": "C:\\Users\\Ryan\\Desktop\\dev\\kar-lang\\rac\\rac.cpp",
+              "DocumentMoniker": "C:\\Users\\Ryan Chanlatte\\Desktop\\_Git\\_pako\\kar-lang\\rac\\rac.cpp",
               "RelativeDocumentMoniker": "rac.cpp",
-              "ToolTip": "C:\\Users\\Ryan\\Desktop\\dev\\kar-lang\\rac\\rac.cpp",
+              "ToolTip": "C:\\Users\\Ryan Chanlatte\\Desktop\\_Git\\_pako\\kar-lang\\rac\\rac.cpp",
               "RelativeToolTip": "rac.cpp",
-              "ViewState": "AQIAADICAAAAAAAAAAAQwIkCAAABAAAA",
+              "ViewState": "AQIAANoBAAAAAAAAAAAlwLQCAAAYAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
               "WhenOpened": "2024-04-01T15:56:53.631Z",
               "EditorCaption": ""
+            }
+          ]
+        },
+        {
+          "DockedWidth": 256,
+          "SelectedChildIndex": -1,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{eefa5220-e298-11d0-8f78-00a0c9110057}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{d78612c7-9962-4b83-95d9-268046dad23a}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{be4d7042-ba3f-11d2-840e-00c04f9902c1}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{34e76e81-ee4a-11d0-ae2e-00a0c90fffc3}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{b1e99781-ab81-11d0-b683-00aa00a3ee26}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{3fd5e0cc-709a-4f8c-94c3-7f0f8dff5bb2}"
             }
           ]
         }
