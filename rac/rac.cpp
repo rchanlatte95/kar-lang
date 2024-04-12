@@ -4,6 +4,7 @@
 #include <math.h>
 #include <float.h>
 #include <stdio.h>
+#include <string>
 #pragma warning(pop)
 
 #ifndef RAC
@@ -14,6 +15,7 @@
 #define NO_INLINE __declspec(noinline)
 
 typedef const char* cstr;   typedef char* mut_cstr;
+typedef const char** cstrptr;   typedef char** mut_cstrptr;
 
 typedef const int8_t i8;    typedef const uint8_t u8;
 typedef int8_t mut_i8;      typedef uint8_t mut_u8;
@@ -49,6 +51,74 @@ typedef const uint64_t* u64ptr; typedef uint64_t* mut_u64ptr;
 
 typedef const float* f32ptr;  typedef int32_t* mut_f32ptr;
 typedef const double* f64ptr; typedef uint32_t* mut_f64ptr;
+
+namespace hopman_fast
+{
+    struct itostr_helper
+    {
+        static unsigned out[10000];
+
+        itostr_helper()
+        {
+            for (int i = 0; i < 10000; i++)
+            {
+                unsigned v = i;
+                char* o = (char*)(out + i);
+                o[3] = v % 10 + '0';
+                o[2] = (v % 100) / 10 + '0';
+                o[1] = static_cast<char>((v % 1000) / 100) + '0';
+                o[0] = static_cast<char>((v % 10000) / 1000);
+                if (o[0])        o[0] |= 0x30;
+                else if (o[1] != '0') o[0] |= 0x20;
+                else if (o[2] != '0') o[0] |= 0x10;
+                else                  o[0] |= 0x00;
+            }
+        }
+    };
+
+    unsigned itostr_helper::out[10000];
+
+    itostr_helper hlp_init;
+
+    template <typename T> void itostr(T o, std::string& out)
+    {
+        typedef itostr_helper hlp;
+
+        unsigned blocks[3], * b = blocks + 2;
+        blocks[0] = o < 0 ? ~o + 1 : o;
+        blocks[2] = blocks[0] % 10000; blocks[0] /= 10000;
+        blocks[2] = hlp::out[blocks[2]];
+
+        if (blocks[0])
+        {
+            blocks[1] = blocks[0] % 10000; blocks[0] /= 10000;
+            blocks[1] = hlp::out[blocks[1]];
+            blocks[2] |= 0x30303030;
+            b--;
+        }
+
+        if (blocks[0])
+        {
+            blocks[0] = hlp::out[blocks[0] % 10000];
+            blocks[1] |= 0x30303030;
+            b--;
+        }
+
+        char* f = ((char*)b);
+        f += 3 - (*f >> 4);
+
+        char* str = (char*)blocks;
+        if (o < 0) *--f = '-';
+        out.assign(f, (str + 12) - f);
+    }
+
+    template <typename T> std::string itostr(T o)
+    {
+        std::string result;
+        itostr(o, result);
+        return result;
+    }
+}
 
 namespace rac
 {
@@ -137,6 +207,7 @@ namespace rac
 
     namespace string
     {
+        #define RAC_DIGIT_TO_CHAR(x) (x + 48)
         const i32 SSTR_BASE_BYTE_SIZE = BYTES_IN_KB / 8;
         const i32 SSTR_CAPACITY = SSTR_BASE_BYTE_SIZE - sizeof(i32);
         const i32 SSTR_MAX_LEN = SSTR_CAPACITY - 1;
@@ -317,6 +388,19 @@ namespace rac
                 chars[len] = 0;
                 return *this;
             }
+            INLINE str_ref operator+=(i32 i)
+            {
+                if (len == SSTR_MAX_LEN) return *this;
+
+                i32 sgn = i < 0 ? 1 : 0;
+
+                if (i < 10)
+                {
+                    RAC_DIGIT_TO_CHAR(i);
+                }
+
+                return *this;
+            }
 
             INLINE bool operator>(str_ref rhs)
             {
@@ -371,6 +455,7 @@ namespace rac
 
             INLINE cstr ToCstr() const { return (cstr)(&chars[0]); }
             INLINE ptr ToPtr() const { return (ptr)(&len); }
+            INLINE u8ptr CharPtr() const { return chars; }
             INLINE str_ref ToRef() const { return *this; }
 
             INLINE u8& First() { return chars[0]; }
@@ -459,14 +544,13 @@ namespace rac
             }
         };
 
-        INLINE static str operator +(cstr lhs, str_ref rhs)
+        INLINE static str operator +(str_ref lhs, str_ref rhs)
         {
             str res(lhs);
             res += rhs;
             return res;
         }
-
-        INLINE static str operator +(str_ref lhs, str_ref rhs)
+        INLINE static str operator +(cstr lhs, str_ref rhs)
         {
             str res(lhs);
             res += rhs;
@@ -642,14 +726,29 @@ namespace rac
     {
         using namespace rac::string;
 
-        static INLINE int Print(str_ref s) { return printf("%s", s.ToCstr()); }
+        static INLINE int Print(str_ref s)
+        {
+            u8ptr head = s.CharPtr();
+            mut_i32 len = s.Length();
+            while (--len) { _fputchar(*head++); }
+            return s.Length();
+        }
         static INLINE int Println(str_ref s)
         {
-            return printf("%s\r\n", s.ToCstr());
+            u8ptr head = s.CharPtr();
+            mut_i32 len = s.Length();
+            while (--len) { _fputchar(*head++); }
+            _fputchar('\r'); _fputchar('\n');
+            return s.Length() + 2;
         }
 
-        static INLINE int Print(char c) { return printf(&c); }
-        static INLINE int Println(char c) { return printf("%c\r\n", c); }
+        static INLINE int Print(char c) { return _fputchar(c); }
+        static INLINE int Println(char c)
+        {
+            _fputchar(c);
+            _fputchar('\r'); _fputchar('\n');
+            return 3;
+        }
     }
 }
 
@@ -689,8 +788,12 @@ int main()
     using namespace rac::io;
 
     str testStr;
-    v2 test(1.0f, 2.0f);
-    test.ToStr(testStr);
 
-    Println("v2 test = " + testStr);
+    for (int i = 10; i < 100; ++i)
+    {
+        printf("case %d: ", i);
+    }
+
+    //i32 poopy = 1;
+    //Println(poopy);
 }
