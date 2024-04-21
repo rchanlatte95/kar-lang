@@ -1,10 +1,11 @@
 #pragma warning(push, 0)// Prevent warnings from libraries I can't fix.
+#include <iostream>
 #include <limits>
 #include <vector>
 #include <math.h>
 #include <float.h>
 #include <stdio.h>
-#include <string>
+#include <stdint.h>
 #pragma warning(pop)
 
 #ifndef RAC
@@ -29,8 +30,20 @@ typedef int32_t mut_i32;    typedef uint32_t mut_u32;
 typedef const int64_t i64;  typedef const uint64_t u64;
 typedef int64_t mut_i64;    typedef uint64_t mut_u64;
 
+typedef const int_fast8_t Int8;    typedef const uint_fast8_t UInt8;
+typedef int_fast8_t mut_Int8;    typedef uint_fast8_t mut_UInt8;
+
+typedef const int_fast16_t Int16;    typedef const uint_fast16_t UInt16;
+typedef int_fast16_t mut_Int16;    typedef uint_fast16_t mut_UInt16;
+
+typedef const int_fast32_t Int32;    typedef const uint_fast32_t UInt32;
+typedef int_fast32_t mut_Int32;    typedef uint_fast32_t mut_UInt32;
+
+typedef const int_fast64_t Int64;    typedef const uint_fast64_t UInt64;
+typedef int_fast64_t mut_Int64;    typedef uint_fast64_t mut_UInt64;
+
 typedef const float f32;    typedef const float& f32_ref;   typedef float mut_f32;
-typedef const double f64;   typedef const double& f64_ref;        typedef double mut_f64;
+typedef const double f64;   typedef const double& f64_ref;  typedef double mut_f64;
 
 typedef const uint8_t* utf8ptr; typedef const wchar_t* utf16ptr;
 typedef uint8_t* mut_utf8ptr;   typedef wchar_t* mut_utf16ptr;
@@ -84,7 +97,7 @@ namespace hopman_fast
     {
         typedef itostr_helper hlp;
 
-        unsigned blocks[3], * b = blocks + 2;
+        unsigned blocks[3]{}, * b = blocks + 2;
         blocks[0] = o < 0 ? ~o + 1 : o;
         blocks[2] = blocks[0] % 10000; blocks[0] /= 10000;
         blocks[2] = hlp::out[blocks[2]];
@@ -134,24 +147,21 @@ namespace rac
         class Bool
         {
         private:
-            bool truth_value = false;
+            bool value = false;
 
         public:
+            Bool() { value = false; }
+            Bool(bool b) { value = b; }
 
-            Bool() { truth_value = false; }
-            Bool(bool b) { truth_value = b; }
-            Bool(i8 i) { truth_value = i != 0; } Bool(u8 u) { truth_value = u != 0; }
-            Bool(i16 i) { truth_value = i != 0; } Bool(u16 u) { truth_value = u != 0; }
-            Bool(i32 i) { truth_value = i != 0; } Bool(u32 u) { truth_value = u != 0; }
-            Bool(i64 i) { truth_value = i != 0; } Bool(u64 u) { truth_value = u != 0; }
-
-            cstr Cstr() const
-            {
-                return truth_value ? "true" : "false";
-            }
+            Bool(i8 i) { value = i != 0; }  Bool(u8 u) { value = u != 0; }
+            Bool(i16 i) { value = i != 0; } Bool(u16 u) { value = u != 0; }
+            Bool(i32 i) { value = i != 0; } Bool(u32 u) { value = u != 0; }
+            Bool(i64 i) { value = i != 0; } Bool(u64 u) { value = u != 0; }
+            cstr Cstr() const { return value ? "true" : "false"; }
+            Int8 ToInt() const { return value ? 1 : 0; }
         };
 
-        enum Comparison : int_fast8_t
+        enum Comparison : Int8
         {
             Null = SCHAR_MIN,
             LessThan = -1,
@@ -196,19 +206,20 @@ namespace rac
             {
                 switch (comparison_value)
                 {
-                    case LessThan: return "Less Than";
-                    case Equal: return "Equal";
-                    case GreaterThan: return "Greater Than";
-                    default: return "Null";
+                case LessThan: return "Less Than";
+                case Equal: return "Equal";
+                case GreaterThan: return "Greater Than";
+                default: return "Null";
                 }
             }
         };
     }
 
+
     namespace string
     {
         #define RAC_DIGIT_TO_CHAR(x) (x + 48)
-        const i32 SSTR_BASE_BYTE_SIZE = BYTES_IN_KB / 8;
+        const i32 SSTR_BASE_BYTE_SIZE = UINT8_MAX;
         const i32 SSTR_CAPACITY = SSTR_BASE_BYTE_SIZE - sizeof(i32);
         const i32 SSTR_MAX_LEN = SSTR_CAPACITY - 1;
 
@@ -228,7 +239,6 @@ namespace rac
             if (x < 0) return 0;
             return x;
         }
-
         static constexpr bool whitespace(u8 c)
         {
             return  c == SPACE ||
@@ -236,14 +246,13 @@ namespace rac
                     c == CHAR_TAB || c == LINE_TAB ||
                     c == NEXT_LINE || c == NO_BREAK_SPACE;
         }
-
         static constexpr bool whitespace(u8ptr c_ptr) { return  whitespace(*c_ptr); }
 
-        class alignas(8) str;
+        class str;
         typedef const str* str_ptr;   typedef str* mut_str_ptr;
         typedef const str& str_ref;   typedef str& mut_str_ref;
 
-        class alignas(8) str
+        class str
         {
         private:
             mut_i32 len = 0;
@@ -318,7 +327,7 @@ namespace rac
 
             INLINE i32 MaxLength() const { return SSTR_MAX_LEN; }
             INLINE i32 Length() const { return len; }
-            INLINE utf8ptr Str() { return &chars[0]; }
+            INLINE utf8ptr Str() const { return &chars[0]; }
             INLINE bool Empty() const { return len == 0; }
             INLINE void Clear() { len = 0; chars[0] = 0; }
             INLINE void Fill(u8 c, i32 ct = SSTR_MAX_LEN)
@@ -388,19 +397,6 @@ namespace rac
                 chars[len] = 0;
                 return *this;
             }
-            INLINE str_ref operator+=(i32 i)
-            {
-                if (len == SSTR_MAX_LEN) return *this;
-
-                i32 sgn = i < 0 ? 1 : 0;
-
-                if (i < 10)
-                {
-                    RAC_DIGIT_TO_CHAR(i);
-                }
-
-                return *this;
-            }
 
             INLINE bool operator>(str_ref rhs)
             {
@@ -446,11 +442,11 @@ namespace rac
 
             INLINE logic::comp Compare(str_ref arg)
             {
-                return logic::comp(memcmp(ptr(&this->len), ptr(&arg.len), this->len));
+                return logic::comp(memcmp(ptr(&len), ptr(&arg.len), len));
             }
             INLINE logic::comp Compare(cstr c_str)
             {
-                return logic::comp(memcmp(ptr(&this->chars[0]), ptr(c_str), this->len));
+                return logic::comp(memcmp(ptr(&chars[0]), ptr(c_str), len));
             }
 
             INLINE cstr ToCstr() const { return (cstr)(&chars[0]); }
@@ -458,8 +454,8 @@ namespace rac
             INLINE u8ptr CharPtr() const { return chars; }
             INLINE str_ref ToRef() const { return *this; }
 
-            INLINE u8& First() { return chars[0]; }
-            INLINE u8& Last() { return chars[len - 1]; }
+            INLINE u8& First() const { return chars[0]; }
+            INLINE u8& Last() const { return chars[len - 1]; }
             INLINE str_ref TrimStart()
             {
                 if (len < 1) return *this;
@@ -580,8 +576,12 @@ namespace rac
             mut_f32 x = 0.0f;
             mut_f32 y = 0.0f;
 
+            v2(i8 _x, i8 _y) { x = (mut_f32)_x; y = (mut_f32)_y; }
+            v2(i16 _x, i16 _y) { x = (mut_f32)_x; y = (mut_f32)_y; }
             v2(i32 _x, i32 _y) { x = (mut_f32)_x; y = (mut_f32)_y; }
             v2(i64 _x, i64 _y) { x = (mut_f32)_x; y = (mut_f32)_y; }
+            v2(i8 a) { x = (mut_f32)a; y = (mut_f32)a; }
+            v2(i16 a) { x = (mut_f32)a; y = (mut_f32)a; }
             v2(i32 a) { x = (mut_f32)a; y = (mut_f32)a; }
             v2(i64 a) { x = (mut_f32)a; y = (mut_f32)a; }
 
@@ -631,7 +631,7 @@ namespace rac
             INLINE str_ref ToStr(mut_str_ref str) const
             {
                 char buff[F32_STR_MAX] = { 0 };
-                sprintf_s(buff, "(%0.4f, %0.4f)", x, y);
+                sprintf_s(buff, F32_STR_MAX, "(%0.3f, %0.3f)", x, y);
                 str = buff;
                 return str;
             }
@@ -667,7 +667,8 @@ namespace rac
         }
         INLINE static bool operator ==(v2_ref lhs, v2_ref rhs)
         {
-            return RAC_F32_APPROX(lhs.x, rhs.x) && RAC_F32_APPROX(lhs.y, rhs.y);
+            return  RAC_F32_APPROX(lhs.x, rhs.x) &&
+                    RAC_F32_APPROX(lhs.y, rhs.y);
         }
         INLINE static bool operator !=(v2_ref lhs, v2_ref rhs)
         {
@@ -754,33 +755,6 @@ namespace rac
 
 #endif
 
-/*
-static void test_str()
-{
-    using namespace std;
-    using namespace rac::stack_utf8_string;
-    using namespace rac::logic;
-
-    printf("sizeof(sstr) = %i bytes\r\n", (i32)sizeof(str));
-
-    str stack_str_0 = str("Hello World!");
-    str stack_str_1 = str(stack_str_0, 0, 5);
-    stack_str_1 += " World!";
-    printf("stack_str_0 : = %s\r\n", stack_str_1.ToCstr());
-
-    printf("\r\nstack_str_0 == stack_str_1 => %s\r\n", Bool(stack_str_0 == stack_str_1).Cstr());
-    printf("\r\nstack_str_0 == \"Hello World!\" => %s\r\n", Bool(stack_str_0 == "Hello World!").Cstr());
-
-    comp comparisonResult = stack_str_0.Compare(stack_str_1);
-    printf("stack_str_0.Compare(stack_str_1) => %s\r\n", comparisonResult.Cstr());
-    printf("\r\n\r\n-----\r\n");
-
-    str stack_str_3 = str("     \r\n\t     test     \r\n\t");
-    printf("Before trim(): => |%s|\r\n", stack_str_3.ToCstr());
-    printf("After trim(): => |%s|\r\n", stack_str_3.TrimStart().ToCstr());
-}
-*/
-
 int main()
 {
     using namespace rac::string;
@@ -788,12 +762,8 @@ int main()
     using namespace rac::io;
 
     str testStr;
-
     for (int i = 10; i < 100; ++i)
     {
         printf("case %d: ", i);
     }
-
-    //i32 poopy = 1;
-    //Println(poopy);
 }

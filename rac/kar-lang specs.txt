@@ -1,0 +1,7 @@
+cache line automatically grabs data
+
+could be useful to have don't remove from L1 cache keyword (don't evict?)
+
+independent/dependent keywords
+
+regular/irregular loops
