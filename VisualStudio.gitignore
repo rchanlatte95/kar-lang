@@ -79,10 +79,12 @@ StyleCopReport.xml
 *.pch
 *.pdb
 *.ipdb
+*.ipch
 *.pgc
 *.pgd
 *.rsp
 *.sbr
+*.suo
 *.tlb
 *.tli
 *.tlh
