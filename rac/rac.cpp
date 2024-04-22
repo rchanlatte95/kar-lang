@@ -142,23 +142,77 @@ namespace rac
     const u64 X86_STACK_BYTE_SIZE = BYTES_IN_MB;
     const u64 X64_STACK_BYTE_SIZE = BYTES_IN_MB * 4;
 
+    namespace rnd
+    {
+        namespace xor64
+        {
+            mut_u64 u64_state = 88172645463325252LL;
+            static u64 GetU64()
+            {
+                mut_u64 x = u64_state;
+                x ^= x << 13;
+                x ^= x >> 7;
+                x ^= x << 17;
+                return u64_state = x;
+            }
+
+            /*
+            mut_i64 i64_state = 1680588011350901LL;
+            static i64 GetI64()
+            {
+                mut_i64 x = (mut_i64)i64_state;
+                x ^= x << 9;
+                x ^= x >> 21;
+                x ^= x << 11;
+                return i64_state = x;
+            }
+            */
+        }
+    }
+
     namespace logic
     {
+        class Bool;
+        typedef const Bool* Bool_ptr;   typedef Bool* mut_Bool_ptr;
+        typedef const Bool& Bool_ref;   typedef Bool& mut_Bool_ref;
+
         class Bool
         {
         private:
-            bool value = false;
+            mut_Int8 value = false;
 
         public:
-            Bool() { value = false; }
-            Bool(bool b) { value = b; }
+            Bool() { value = 0; }
+            Bool(bool b) { value = b ? 1 : 0; }
 
-            Bool(i8 i) { value = i != 0; }  Bool(u8 u) { value = u != 0; }
-            Bool(i16 i) { value = i != 0; } Bool(u16 u) { value = u != 0; }
-            Bool(i32 i) { value = i != 0; } Bool(u32 u) { value = u != 0; }
-            Bool(i64 i) { value = i != 0; } Bool(u64 u) { value = u != 0; }
+            Bool(i8 i) { value = i != 0 ? 1 : 0; }
+            Bool(u8 u) { value = u != 0 ? 1 : 0; }
+
+            Bool(i16 i) { value = i != 0 ? 1 : 0; }
+            Bool(u16 u) { value = u != 0 ? 1 : 0; }
+
+            Bool(i32 i) { value = i != 0 ? 1 : 0; }
+            Bool(u32 u) { value = u != 0 ? 1 : 0; }
+
+            Bool(i64 i) { value = i != 0 ? 1 : 0; }
+            Bool(u64 u) { value = u != 0 ? 1 : 0; }
+
+            operator bool() const { return value != 0; }
+
             cstr Cstr() const { return value ? "true" : "false"; }
             Int8 ToInt() const { return value ? 1 : 0; }
+
+            INLINE Bool_ref operator=(bool rhs)
+            {
+                value = rhs ? 1 : 0;
+                return *this;
+            }
+
+            INLINE Bool_ref operator=(ptr rhs)
+            {
+                value = rhs != nullptr ? 1 : 0;
+                return *this;
+            }
         };
 
         enum Comparison : Int8
@@ -214,7 +268,6 @@ namespace rac
             }
         };
     }
-
 
     namespace string
     {
@@ -451,7 +504,7 @@ namespace rac
 
             INLINE cstr ToCstr() const { return (cstr)(&chars[0]); }
             INLINE ptr ToPtr() const { return (ptr)(&len); }
-            INLINE u8ptr CharPtr() const { return chars; }
+            INLINE u8ptr PtrToChars() const { return chars; }
             INLINE str_ref ToRef() const { return *this; }
 
             INLINE u8& First() const { return chars[0]; }
@@ -526,6 +579,10 @@ namespace rac
             INLINE bool Contains(u8 target, i32 startIndex) const
             {
                 return IndexOf(target, startIndex) > 0;
+            }
+            INLINE bool NullOrEmpty() const
+            {
+                return *this == nullptr || len < 1;
             }
             INLINE bool EmptyOrWhitespace() const
             {
@@ -698,27 +755,111 @@ namespace rac
         namespace lists
         {
             class singleLink;
-            typedef const singleLink* singleLink_ptr;
-            typedef const singleLink& singleLink_ref;
 
-            const u64 NULL_LIST_ID = 0;
+            typedef const singleLink* singleLink_ptr;
+            typedef singleLink* mut_singleLink_ptr;
+
+            typedef const singleLink& singleLink_ref;
+            typedef singleLink& mut_singleLink_ref;
+
+            const u64 NULL_LIST_ID = (u64)NULL;
 
             class singleLink
             {
-                u64 id = NULL_LIST_ID;
-                ptr data = nullptr;
+            private:
+                mut_u64 id = NULL_LIST_ID;
+
+            public:
+                mut_ptr data = nullptr;
                 singleLink_ptr prev = nullptr;
                 singleLink_ptr next = nullptr;
 
-                INLINE bool Invalid() const {
-                    return    id == NULL_LIST_ID &&
-                        data == nullptr &&
-                        prev == nullptr &&
-                        next == nullptr;
+                singleLink(mut_ptr datum)
+                {
+                    id = rnd::xor64::GetU64();
+                    data = datum;
+                    prev = nullptr;
+                    next = nullptr;
                 }
 
-                INLINE bool Head() const { return prev == nullptr && next != nullptr; }
-                INLINE bool End() const { return prev != nullptr && next == nullptr; }
+                singleLink(mut_ptr datum, singleLink prevNode, singleLink nextNode)
+                {
+                    id = rnd::xor64::GetU64();
+                    data = datum;
+                    prev = &prevNode;
+                    next = &nextNode;
+                }
+
+                INLINE bool Null() const
+                {
+                    return  (id == NULL_LIST_ID || data == nullptr) &&
+                            prev == nullptr &&
+                            next == nullptr;
+                }
+                INLINE bool NotNull() const { !Null(); }
+
+                INLINE bool Head() const
+                {
+                    return NotNull() && prev == nullptr && next != nullptr;
+                }
+
+                INLINE bool End() const
+                {
+                    return NotNull() && prev != nullptr && next == nullptr;
+                }
+
+                INLINE bool Inside() const { !Head() && !End(); }
+
+                INLINE ptr ToRef() const { return &id; }
+
+                INLINE bool operator==(singleLink_ref rhs)
+                {
+                    return memcmp(&id, rhs.ToRef(), 4) == 0;
+                }
+                INLINE bool operator!=(singleLink_ref rhs)
+                {
+                    return memcmp(&id, rhs.ToRef(), 4) != 0;
+                }
+
+                INLINE singleLink_ptr GetHead()
+                {
+                    if (Head()) { return this; }
+
+                    singleLink_ptr currNode = prev;
+                    while (currNode->prev != nullptr) { currNode = prev; }
+                    return currNode;
+                }
+
+                INLINE singleLink_ptr GetEnd()
+                {
+                    if (End()) { return this; }
+
+                    singleLink_ptr currNode = this->prev;
+                    while (currNode->next != nullptr) { currNode = this; }
+                    return currNode;
+                }
+
+                INLINE singleLink_ptr FindInPlace(u64 targetId)
+                {
+                    singleLink_ptr currNode = this;
+                    while ( currNode->next != nullptr &&
+                            currNode->id != targetId)
+                    {
+                        currNode = currNode->next;
+                    }
+
+                    return currNode->NotNull() ? currNode : nullptr;
+                }
+                INLINE singleLink_ptr Find(u64 targetId)
+                {
+                    singleLink_ptr currNode = GetHead();
+                    return FindInPlace(currNode->id);
+                }
+                INLINE singleLink_ptr Find(singleLink_ptr target)
+                {
+                    singleLink_ptr node = Head() ? this : GetHead();
+                    return FindInPlace(node->id);
+                }
             };
         }
     }
@@ -729,14 +870,14 @@ namespace rac
 
         static INLINE int Print(str_ref s)
         {
-            u8ptr head = s.CharPtr();
+            u8ptr head = s.PtrToChars();
             mut_i32 len = s.Length();
             while (--len) { _fputchar(*head++); }
             return s.Length();
         }
         static INLINE int Println(str_ref s)
         {
-            u8ptr head = s.CharPtr();
+            u8ptr head = s.PtrToChars();
             mut_i32 len = s.Length();
             while (--len) { _fputchar(*head++); }
             _fputchar('\r'); _fputchar('\n');
@@ -746,9 +887,7 @@ namespace rac
         static INLINE int Print(char c) { return _fputchar(c); }
         static INLINE int Println(char c)
         {
-            _fputchar(c);
-            _fputchar('\r'); _fputchar('\n');
-            return 3;
+            _fputchar(c); _fputchar('\r'); _fputchar('\n'); return 3;
         }
     }
 }
