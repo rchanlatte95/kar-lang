@@ -342,7 +342,7 @@ namespace rac
 
             str(cstr _str)
             {
-                len = (i32)strnlen_s(_str, SSTR_MAX_LEN);
+                len = (i32)strnlen_s(_str, SSTR_MAX_LEN) + 1;
                 chars[0] = 0;
                 chars[SSTR_MAX_LEN] = 0;
                 memcpy_s(chars, SSTR_MAX_LEN, _str, len);
@@ -636,19 +636,21 @@ namespace rac
     {
         using namespace rac::string;
 
-        const f32 PI = 3.14159265358979323846f;
-        const f32 SIXTH_PI = PI / 6.0f;
-        const f32 FOURTH_PI = PI / 4.0f;
-        const f32 THIRD_PI = PI / 3.0f;
-        const f32 HALF_PI = PI / 2.0f;
-        const f32 TAU = 2.0f * PI;
+        f32 PI = 3.14159265358979323846f;
+        f32 SIXTH_PI = PI / 6.0f;
+        f32 FOURTH_PI = PI / 4.0f;
+        f32 THIRD_PI = PI / 3.0f;
+        f32 HALF_PI = PI / 2.0f;
+        f32 TAU = 2.0f * PI;
 
-        const f32 INV_PI = 1.0f / PI;
-        const f32 DEG2RAD = PI / 180.0f;
-        const f32 RAD2DEG = 180.0f / PI;
+        f32 INV_PI = 1.0f / PI;
+        f32 INV_TAU = 1.0f / TAU;
+        f32 DEG2RAD = PI / 180.0f;
+        f32 RAD2DEG = 180.0f / PI;
 
-        f32 F32_EPSILON = 0.0001f;
+        f32 F32_EPSILON = FLT_EPSILON + 0.000092896e-07F;
         f32 SIGNED_F32_EPSILON = -F32_EPSILON;
+
         f32 F32_ONE_EPSILON = 1.0f - F32_EPSILON;
         f32 SIGNED_F32_ONE_EPSILON = -F32_ONE_EPSILON;
 
@@ -661,7 +663,6 @@ namespace rac
         i32 F32_STR_MAX = RAC_F32_SIGNED_RANGE + 3;
         i32 F32_STR_LEN = F32_STR_MAX - 1;
 
-        #define RAC_F32_APPROX(a, b) (fabsf(a - b) <= F32_EPSILON)
         #define RAC_F32_APPROX_ZERO(a) (fabsf(a) <= F32_EPSILON)
         #define RAC_F32_APPROX_ONE(a) (RAC_F32_APPROX(a, F32_ONE_EPSILON))
 
@@ -672,43 +673,77 @@ namespace rac
         #define RAC_F32_APPROX_POS(a) (a >= F32_EPSILON)
         #define RAC_F32_APPROX_NEG(a) (a <= F32_EPSILON)
 
-        static f32 Clamp(f32 x, f32 min, f32 max)
+        static MAY_INLINE f32 Clamp(f32 x, f32 min, f32 max)
         {
             if (fabsf(x - max) > F32_EPSILON) return max;
             if (fabsf(x - min) < F32_EPSILON) return min;
             return x;
         }
-        static f32 Clamp01(f32 x)
+        static MAY_INLINE f32 Clamp01(f32 x)
         {
             if (fabsf(x - F32_ONE_EPSILON) > F32_EPSILON) return 1.0f;
             if (fabsf(x) < F32_EPSILON) return 0.0f;
             return x;
         }
+        static MAY_INLINE f32 Norm(f32 x, f32 min, f32 max)
+        {
+            return (x - min) / (max - min);
+        }
+        static MAY_INLINE f32 Remap(f32 x,
+                                    f32 inStart, f32 inEnd,
+                                    f32 outStart, f32 outEnd)
+        {
+            return (x - inStart) / (inEnd - inStart) * (outEnd - outStart) + outStart;
+        }
+        static bool Approx(f32 a, f32 b)
+        {
+            if (a == b) return true;
 
-        class v2;
-        typedef const v2* v2_ptr;   typedef const v2& v2_ref;
-        typedef v2* mut_v2_ptr; typedef v2& mut_v2_ref;
+            f32 diff = fabsf(a - b);
+            f32 ep_norm = F32_EPSILON * fminf(std::abs(a + b), FLT_MAX);
+            return diff < ep_norm;
+        }
+        static bool ApproxZero(f32 a)
+        {
+            f32 abs_a = fabsf(a);
+            if (abs_a <= F32_EPSILON) return true;
+            f32 ep_norm = F32_EPSILON * fminf(std::abs(a), FLT_MAX);
+            return abs_a < ep_norm;
+        }
+        static bool ApproxOne(f32 a)
+        {
+            if (a == 1.0f) return true;
+
+            f32 diff = fabsf(a - 1.0f);
+            f32 ep_norm = F32_EPSILON * fminf(std::abs(a + 1.0f), FLT_MAX);
+            return diff < ep_norm;
+        }
+
+        class Vector2;
+        typedef const class Vector2 v2; typedef class Vector2 mut_v2;
+        typedef const Vector2* v2_ptr;  typedef const Vector2& v2_ref;
+        typedef Vector2* mut_v2_ptr;    typedef Vector2& mut_v2_ref;
 
         i32 COMMA_SPACE_LEN = 2;
         i32 PARENTHESES_LEN = 2;
         i32 V2_STRING_MAX = (F32_STR_LEN * 2) + COMMA_SPACE_LEN + PARENTHESES_LEN + 1;
         i32 V2_STRING_LEN = V2_STRING_MAX - 1;
-        class v2
+        class Vector2
         {
         public:
             mut_f32 x = 0.0f;
             mut_f32 y = 0.0f;
 
-            v2(i8 _x, i8 _y) { x = (mut_f32)_x; y = (mut_f32)_y; }
-            v2(i16 _x, i16 _y) { x = (mut_f32)_x; y = (mut_f32)_y; }
-            v2(i32 _x, i32 _y) { x = (mut_f32)_x; y = (mut_f32)_y; }
-            v2(i8 a) { x = (mut_f32)a; y = (mut_f32)a; }
-            v2(i16 a) { x = (mut_f32)a; y = (mut_f32)a; }
-            v2(i32 a) { x = (mut_f32)a; y = (mut_f32)a; }
+            Vector2(i8 _x, i8 _y) { x = (mut_f32)_x; y = (mut_f32)_y; }
+            Vector2(i16 _x, i16 _y) { x = (mut_f32)_x; y = (mut_f32)_y; }
+            Vector2(i32 _x, i32 _y) { x = (mut_f32)_x; y = (mut_f32)_y; }
+            Vector2(i8 a) { x = (mut_f32)a; y = (mut_f32)a; }
+            Vector2(i16 a) { x = (mut_f32)a; y = (mut_f32)a; }
+            Vector2(i32 a) { x = (mut_f32)a; y = (mut_f32)a; }
 
-            v2(f32 _x, f32 _y) { x = _x; y = _y; }
-            v2(f32 a) { x = a; y = a; }
-            v2() { }
+            Vector2(f32 _x, f32 _y) { x = _x; y = _y; }
+            Vector2(f32 a) { x = a; y = a; }
+            Vector2() { }
 
             INLINE v2_ref operator=(v2_ref rhs)
             {
@@ -774,23 +809,23 @@ namespace rac
             }
             INLINE v2 Clamp(f32 min, f32 max)
             {
-                return v2(  x > max ? max : (x < min ? min : x),
-                            y > max ? max : (y < min ? min : y));
+                return v2(x > max ? max : (x < min ? min : x),
+                    y > max ? max : (y < min ? min : y));
             }
             INLINE v2 Clamp(f32 x_min, f32 x_max, f32 y_min, f32 y_max)
             {
-                return v2(  x > x_max ? x_max : (x < x_min ? x_min : x),
-                            y > y_max ? y_max : (y < y_min ? y_min : y));
+                return v2(x > x_max ? x_max : (x < x_min ? x_min : x),
+                    y > y_max ? y_max : (y < y_min ? y_min : y));
             }
             INLINE v2 Clamp(v2 min, v2 max)
             {
-                return v2(  x > max.x ? max.x : (x < min.x ? min.x : x),
-                            y > max.y ? max.y : (y < min.y ? min.y : y));
+                return v2(x > max.x ? max.x : (x < min.x ? min.x : x),
+                    y > max.y ? max.y : (y < min.y ? min.y : y));
             }
 
             INLINE v2 ClampMag(f32 min, f32 max)
             {
-                v2 res = *this;
+                mut_v2 res = *this;
                 mut_f32 len = res.x * res.x + res.y + res.y;
                 if (len > F32_EPSILON)
                 {
@@ -814,7 +849,7 @@ namespace rac
             INLINE f32 Dot(v2_ref v2) const { return x * v2.x + y * v2.y; }
             INLINE f32 Dist(v2_ref from) const
             {
-                return sqrtf((x - from.x)* (x - from.x) + (y * from.y)*(y * from.y));
+                return sqrtf((x - from.x) * (x - from.x) + (y * from.y) * (y * from.y));
             }
             INLINE f32 SqrDist(v2_ref from) const
             {
@@ -829,21 +864,18 @@ namespace rac
             INLINE v2 Norm() const
             {
                 f32 inv_mag = InvMag();
-                if (inv_mag > F32_EPSILON)
-                {
-                    return v2(x * inv_mag, y * inv_mag);
-                }
-                else return *this;
+                return inv_mag > F32_EPSILON ? v2(x * inv_mag, y * inv_mag) : *this;
             }
             INLINE v2 Rotate(f32 radians) const
             {
                 f32 cosRes = cosf(radians);
                 f32 sinRes = sinf(radians);
-                return v2(x*cosRes - y * sinRes, x*sinRes + y * cosRes);
+                return v2(  x * cosRes - y * sinRes,
+                            x * sinRes + y * cosRes);
             }
-            INLINE v2 RotateDeg(f32 degrees) const
+            INLINE v2 RotateDegrees(f32 degrees) const
             {
-                return Rotate(degrees * RAD2DEG);
+                return Rotate(degrees * DEG2RAD);
             }
             INLINE v2 Perpendicular() const { return v2(y, -x); }
         };
@@ -889,22 +921,31 @@ namespace rac
         {
             return v2(lhs.x / rhs.x, lhs.y / rhs.y);
         }
+        INLINE static v2 operator *(v2_ref lhs, f32_ref rhs)
+        {
+            return v2(lhs.x * rhs, lhs.y * rhs);
+        }
+        INLINE static v2 operator /(v2_ref lhs, f32_ref rhs)
+        {
+            return v2(lhs.x / rhs, lhs.y / rhs);
+        }
 
-        const v2 V2_ZERO = v2(0.0f, 0.0f);
-        const v2 V2_ONE = v2(1.0f, 1.0f);
-        const v2 V2_SIGNED_ONE = -V2_ONE;
+        v2 V2_ZERO = v2(0.0f);
+        v2 V2_ONE = v2(1.0f);
+        v2 V2_SIGNED_ONE = -V2_ONE;
 
-        const v2 V2_RIGHT = v2(1.0f, 0.0f);
-        const v2 V2_LEFT = -V2_RIGHT;
-        const v2 V2_UP = v2(0.0f, 1.0f);
-        const v2 V2_DOWN = -V2_UP;
+        v2 V2_RIGHT = v2(1.0f, 0.0f);
+        v2 V2_UP = v2(0.0f, 1.0f);
+
+        v2 V2_LEFT = -V2_RIGHT;
+        v2 V2_DOWN = -V2_UP;
 
         // Check if two vectors are approximately equal
-        static MAY_INLINE bool Approx(v2_ref a, v2_ref b)
+        static bool Approx(v2_ref a, v2_ref b)
         {
-            return RAC_F32_APPROX(a.x, b.x) && RAC_F32_APPROX(a.y, b.y);
+            return Approx(a.x, b.x) && Approx(a.y, b.y);
         }
-        static MAY_INLINE bool NotApprox(v2_ref a, v2_ref b)
+        static bool NotApprox(v2_ref a, v2_ref b)
         {
             return !Approx(a, b);
         }
@@ -926,9 +967,9 @@ namespace rac
 
         static MAY_INLINE v2 Refract(v2_ref incoming, v2_ref normal, f32 refractRatio)
         {
-            v2 res = V2_ZERO;
+            mut_v2 res = V2_ZERO;
             f32 dot = incoming.Dot(normal);
-            mut_f32 d = 1.0f - refractRatio * refractRatio * (1.0f - dot*dot);
+            mut_f32 d = 1.0f - refractRatio * refractRatio * (1.0f - dot * dot);
             if (d >= F32_EPSILON)
             {
                 d = sqrtf(d);
@@ -939,83 +980,95 @@ namespace rac
             return res;
         }
 
-        class v3;
-        typedef const v3* v3_ptr;   typedef const v3& v3_ref;
-        typedef v3* mut_v3_ptr; typedef v3& mut_v3_ref;
+        class Vector3;
+        typedef const class Vector3 v3; typedef class Vector3 mut_v3;
+        typedef const Vector3* v3_ptr;  typedef const Vector3& v3_ref;
+        typedef Vector3* mut_v3_ptr;    typedef Vector3& mut_v3_ref;
+
+        INLINE static bool operator ==(v3_ref lhs, v3_ref rhs);
+        INLINE static bool operator !=(v3_ref lhs, v3_ref rhs);
+
+        INLINE static v3 operator +(v3_ref lhs, v3_ref rhs);
+        INLINE static v3 operator -(v3_ref lhs, v3_ref rhs);
+        INLINE static v3 operator *(v3_ref lhs, v3_ref rhs);
+        INLINE static v3 operator /(v3_ref lhs, v3_ref rhs);
+
+        INLINE static v3 operator *(v3_ref lhs, f32_ref rhs);
+        INLINE static v3 operator /(v3_ref lhs, f32_ref rhs);
 
         i32 V3_STRING_MAX = (F32_STR_LEN * 3) + (COMMA_SPACE_LEN * 2) + PARENTHESES_LEN + 1;
         i32 V3_STRING_LEN = V3_STRING_MAX - 1;
-        class v3
+        class Vector3
         {
         public:
             mut_f32 x = 0.0f;
             mut_f32 y = 0.0f;
             mut_f32 z = 0.0f;
 
-            v3() { }
+            Vector3() { }
 
-            v3(i8 _x, i8 _y, i8 _z)
+            Vector3(i8 _x, i8 _y, i8 _z)
             {
                 x = (mut_f32)_x;
                 y = (mut_f32)_y;
                 z = (mut_f32)_z;
             }
-            v3(i16 _x, i16 _y, i16 _z)
+            Vector3(i16 _x, i16 _y, i16 _z)
             {
                 x = (mut_f32)_x;
                 y = (mut_f32)_y;
                 z = (mut_f32)_z;
             }
-            v3(i32 _x, i32 _y, i32 _z)
+            Vector3(i32 _x, i32 _y, i32 _z)
             {
                 x = (mut_f32)_x;
                 y = (mut_f32)_y;
                 z = (mut_f32)_z;
             }
-            v3(u8 _x, u8 _y, u8 _z)
+            Vector3(u8 _x, u8 _y, u8 _z)
             {
                 x = (mut_f32)_x;
                 y = (mut_f32)_y;
                 z = (mut_f32)_z;
             }
-            v3(u16 _x, u16 _y, u16 _z)
+            Vector3(u16 _x, u16 _y, u16 _z)
             {
                 x = (mut_f32)_x;
                 y = (mut_f32)_y;
                 z = (mut_f32)_z;
             }
-            v3(u32 _x, u32 _y, u32 _z)
+            Vector3(u32 _x, u32 _y, u32 _z)
             {
                 x = (mut_f32)_x;
                 y = (mut_f32)_y;
                 z = (mut_f32)_z;
             }
 
-            v3(f32 _a)
+            Vector3(f32 _a)
             {
                 x = _a;
                 y = _a;
                 z = _a;
             }
-            v3(f32 _x, f32 _y)
+            Vector3(f32 _x, f32 _y)
             {
                 x = _x;
                 y = _y;
                 z = 0.0f;
             }
-            v3(f32 _x, f32 _y, f32 _z)
+            Vector3(f32 _x, f32 _y, f32 _z)
             {
                 x = _x;
                 y = _y;
                 z = _z;
             }
-            v3(v2 v, f32 _z)
+            Vector3(v2 v, f32 _z)
             {
                 x = v.x;
                 y = v.y;
                 z = _z;
             }
-            v3(v2 v)
+            Vector3(v2 v)
             {
                 x = v.x;
                 y = v.y;
@@ -1093,21 +1146,21 @@ namespace rac
             }
             INLINE v3 Clamp(f32 min, f32 max)
             {
-                return v3(  x > max ? max : (x < min ? min : x),
-                            y > max ? max : (y < min ? min : y),
-                            z > max ? max : (z < min ? min : z));
+                return v3(x > max ? max : (x < min ? min : x),
+                    y > max ? max : (y < min ? min : y),
+                    z > max ? max : (z < min ? min : z));
             }
             INLINE v3 Clamp(f32 x_min, f32 x_max, f32 y_min, f32 y_max, f32 z_min, f32 z_max)
             {
-                return v3(  x > x_max ? x_max : (x < x_min ? x_min : x),
-                            y > y_max ? y_max : (y < y_min ? y_min : y),
-                            z > z_max ? z_max : (z < z_min ? z_min : z));
+                return v3(x > x_max ? x_max : (x < x_min ? x_min : x),
+                    y > y_max ? y_max : (y < y_min ? y_min : y),
+                    z > z_max ? z_max : (z < z_min ? z_min : z));
             }
             INLINE v3 Clamp(v3 min, v3 max)
             {
-                return v3(  x > max.x ? max.x : (x < min.x ? min.x : x),
-                            y > max.y ? max.y : (y < min.y ? min.y : y),
-                            z > max.z ? max.z : (z < min.z ? min.z : z));
+                return v3(x > max.x ? max.x : (x < min.x ? min.x : x),
+                    y > max.y ? max.y : (y < min.y ? min.y : y),
+                    z > max.z ? max.z : (z < min.z ? min.z : z));
             }
             INLINE v3 Inv() const
             {
@@ -1132,35 +1185,28 @@ namespace rac
             INLINE f32 Dist(v3_ref from) const
             {
                 return sqrtf((x - from.x) * (x - from.x) +
-                            (y * from.y) * (y * from.y) +
-                            (z * from.z) * (z * from.z));
+                    (y * from.y) * (y * from.y) +
+                    (z * from.z) * (z * from.z));
             }
             INLINE f32 SqrDist(v3_ref from) const
             {
                 return  (x - from.x) * (x - from.x) +
-                        (y * from.y) * (y * from.y) +
-                        (z * from.z) * (z * from.z);
+                    (y * from.y) * (y * from.y) +
+                    (z * from.z) * (z * from.z);
             }
             INLINE v3 Norm() const
             {
                 f32 inv_mag = InvMag();
-                if (inv_mag > F32_EPSILON)
-                {
-                    return v3(x * inv_mag, y * inv_mag, z * inv_mag);
-                }
-                else return *this;
+                return inv_mag > F32_EPSILON ? v3(x * inv_mag, y * inv_mag, z * inv_mag) : *this;
             }
 
-            // Cross product with unit X Vector3
-            // Unit X == v3(1.0f, 0.0f, 0.0f)
+            // Cross product with unit X
             INLINE v3 CrossX() { return v3(0.0f, z, -y); }
 
-            // Cross product with unit Y Vector3
-            // Unit Y == v3(0.0f, 1.0f, 0.0f)
+            // Cross product with unit Y
             INLINE v3 CrossY() { return v3(-z, 0.0f, x); }
 
-            // Cross product with unit X Vector3
-            // Unit Z == v3(0.0f, 0.0f, 1.0f)
+            // Cross product with unit X
             INLINE v3 CrossZ() { return v3(y, -x, 0.0f); }
         };
 
@@ -1206,39 +1252,318 @@ namespace rac
             return v3(lhs.x / rhs.x, lhs.y / rhs.y, lhs.z / rhs.z);
         }
 
-        // Check if two vectors are approximately equal
-        static MAY_INLINE bool Approx(v3_ref a, v3_ref b)
+        INLINE static v3 operator *(v3_ref lhs, f32_ref rhs)
         {
-            return  RAC_F32_APPROX(a.x, b.x) &&
-                    RAC_F32_APPROX(a.y, b.y) &&
-                    RAC_F32_APPROX(a.z, b.z);
+            return v3(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs);
         }
-        static MAY_INLINE bool NotApprox(v3_ref a, v3_ref b)
+        INLINE static v3 operator /(v3_ref lhs, f32_ref rhs)
+        {
+            f32 inv = 1.0f / rhs;
+            return v3(lhs.x * inv, lhs.y * inv, lhs.z * inv);
+        }
+
+        // Check if two vectors are approximately equal
+        MAY_INLINE static bool Approx(v3_ref a, v3_ref b)
+        {
+            return  Approx(a.x, b.x) &&
+                    Approx(a.y, b.y) &&
+                    Approx(a.z, b.z);
+        }
+        MAY_INLINE static bool NotApprox(v3_ref a, v3_ref b)
         {
             return !Approx(a, b);
         }
 
-        static MAY_INLINE v3 Cross(v3 v1, v3 v2)
+        MAY_INLINE static v3 Cross(v3_ref v1, v3_ref v2)
         {
             return v3(  v1.y * v2.z - v1.z * v2.y,
                         v1.z * v2.x - v1.x * v2.z,
                         v1.x * v2.y - v1.y * v2.x);
         }
 
-        const v3 V3_ZERO = v3(0.0f);
-        const v3 V3_ONE = v3(1.0f);
-        const v3 V3_SIGNED_ONE = -V3_ONE;
+        v3 V3_ZERO = v3(0.0f);
+        v3 V3_ONE = v3(1.0f);
+        v3 V3_SIGNED_ONE = -V3_ONE;
 
-        const v3 V3_RIGHT = v3(1.0f, 0.0f, 0.0f);
-        const v3 V3_LEFT = -V3_RIGHT;
+        v3 V3_RIGHT = v3(1.0f, 0.0f, 0.0f);
+        v3 V3_UP = v3(0.0f, 1.0f, 0.0f);
+        v3 V3_FORWARD = v3(0.0f, 0.0f, 1.0f);
 
-        const v3 V3_UP = v3(0.0f, 1.0f, 0.0f);
-        const v3 V3_DOWN = -V3_UP;
+        v3 V3_LEFT = -V3_RIGHT;
+        v3 V3_DOWN = -V3_UP;
+        v3 V3_BACKWARD = -V3_FORWARD;
 
-        const v3 V3_FORWARD = v3(0.0f, 0.0f, 1.0f);
-        const v3 V3_BACKWARD = -V3_FORWARD;
+        class Quaternion;
+        typedef const Quaternion quat;      typedef Quaternion mut_quat;
+        typedef const Quaternion* quat_ptr; typedef const Quaternion& quat_ref;
+        typedef Quaternion* mut_quat_ptr;   typedef Quaternion& mut_quat_ref;
+
+        INLINE static bool operator ==(quat_ref lhs, quat_ref rhs);
+        INLINE static bool operator !=(quat_ref lhs, quat_ref rhs);
+
+        INLINE static quat operator +(quat_ref lhs, quat_ref rhs);
+        INLINE static quat operator -(quat_ref lhs, quat_ref rhs);
+        INLINE static quat operator *(quat_ref lhs, f32_ref rhs);
+        INLINE static quat operator /(quat_ref lhs, f32_ref rhs);
+
+        i32 QUAT_STRING_MAX = (F32_STR_LEN * 4) + (COMMA_SPACE_LEN * 3) + PARENTHESES_LEN + 1;
+        i32 QUAT_STRING_LEN = QUAT_STRING_MAX - 1;
+        class Quaternion
+        {
+        public:
+            mut_f32 x = 0.0f;
+            mut_f32 y = 0.0f;
+            mut_f32 z = 0.0f;
+            mut_f32 w = 0.0f;
+
+            Quaternion() { }
+            Quaternion(i8 _x, i8 _y, i8 _z, i8 _w)
+            {
+                x = (mut_f32)_x;
+                y = (mut_f32)_y;
+                z = (mut_f32)_z;
+                w = (mut_f32)_w;
+            }
+            Quaternion(i16 _x, i16 _y, i16 _z, i16 _w)
+            {
+                x = (mut_f32)_x;
+                y = (mut_f32)_y;
+                z = (mut_f32)_z;
+                w = (mut_f32)_w;
+            }
+            Quaternion(i32 _x, i32 _y, i32 _z, i32 _w)
+            {
+                x = (mut_f32)_x;
+                y = (mut_f32)_y;
+                z = (mut_f32)_z;
+                w = (mut_f32)_w;
+            }
+            Quaternion(u8 _x, u8 _y, u8 _z, u8 _w)
+            {
+                x = (mut_f32)_x;
+                y = (mut_f32)_y;
+                z = (mut_f32)_z;
+                w = (mut_f32)_w;
+            }
+            Quaternion(u16 _x, u16 _y, u16 _z, u16 _w)
+            {
+                x = (mut_f32)_x;
+                y = (mut_f32)_y;
+                z = (mut_f32)_z;
+                w = (mut_f32)_w;
+            }
+            Quaternion(u32 _x, u32 _y, u32 _z, u32 _w)
+            {
+                x = (mut_f32)_x;
+                y = (mut_f32)_y;
+                z = (mut_f32)_z;
+                w = (mut_f32)_w;
+            }
+            Quaternion(f32 _a)
+            {
+                x = _a;
+                y = _a;
+                z = _a;
+                w = _a;
+            }
+            Quaternion(f32 _x, f32 _y, f32 _z)
+            {
+                x = _x;
+                y = _y;
+                z = _z;
+                w = 1.0f;
+            }
+            Quaternion(f32 _x, f32 _y, f32 _z, f32 _w)
+            {
+                x = _x;
+                y = _y;
+                z = _z;
+                w = _w;
+            }
+            Quaternion(v3 v, f32 _w)
+            {
+                x = v.x;
+                y = v.y;
+                z = v.z;
+                w = _w;
+            }
+            Quaternion(v3 v)
+            {
+                x = v.x;
+                y = v.y;
+                z = v.z;
+                w = 1.0f;
+            }
+
+            INLINE quat Conjugate() const { return quat(-x, -y, -z, w); }
+
+            INLINE quat_ref operator=(quat_ref rhs)
+            {
+                x = rhs.x;
+                y = rhs.y;
+                z = rhs.z;
+                w = rhs.w;
+            }
+            INLINE quat operator -() const
+            {
+                return quat(-x, -y, -z, -w);
+            }
+            INLINE quat operator *(f32 v)
+            {
+                return quat(x * v, y * v, z * v, w * v);
+            }
+            INLINE quat operator /(f32 v)
+            {
+                f32 inv = 1.0f / v;
+                return quat(x * inv, y * inv, z * inv, w * inv);
+            }
+            INLINE quat_ref operator +=(quat_ref rhs)
+            {
+                x += rhs.x;
+                y += rhs.y;
+                z += rhs.z;
+                w += rhs.w;
+            }
+            INLINE quat_ref operator -=(quat_ref rhs)
+            {
+                x -= rhs.x;
+                y -= rhs.y;
+                z -= rhs.z;
+                w -= rhs.w;
+            }
+            INLINE quat_ref operator *=(quat_ref rhs)
+            {
+
+            }
+            INLINE quat_ref operator *=(f32 a)
+            {
+                x *= a;
+                y *= a;
+                z *= a;
+                w *= a;
+            }
+            INLINE quat_ref operator /=(quat_ref rhs)
+            {
+
+            }
+            INLINE quat_ref operator /=(f32 a)
+            {
+                f32 inv = 1.0f / a;
+                x *= inv;
+                y *= inv;
+                z *= inv;
+                w *= inv;
+            }
+
+            INLINE ptr Ptr() const { return (ptr)(&x); }
+            INLINE quat_ref Ref() const { return *this; }
+
+            INLINE str_ref ToStr(mut_str_ref str) const
+            {
+                char buff[QUAT_STRING_MAX] = { 0 };
+                sprintf_s(buff, QUAT_STRING_LEN, "(%0.3f, %0.3f, %0.3f, %0.3f)", x, y, z, w);
+                return str = buff;
+            }
+
+            INLINE quat Max(quat v)
+            {
+                return quat(fmaxf(x, v.x), fmaxf(y, v.y), fmaxf(z, v.z), fmaxf(w, v.w));
+            }
+            INLINE quat Min(quat v)
+            {
+                return quat(fminf(x, v.x), fminf(y, v.y), fminf(z, v.z), fminf(w, v.w));
+            }
+            INLINE quat Clamp(f32 min, f32 max)
+            {
+                return quat(    x > max ? max : (x < min ? min : x),
+                                y > max ? max : (y < min ? min : y),
+                                z > max ? max : (z < min ? min : z),
+                                w > max ? max : (w < min ? min : w));
+            }
+            INLINE quat Clamp(f32 x_min, f32 x_max, f32 y_min, f32 y_max, f32 z_min, f32 z_max, f32 w_min, f32 w_max)
+            {
+                return quat(x > x_max ? x_max : (x < x_min ? x_min : x),
+                            y > y_max ? y_max : (y < y_min ? y_min : y),
+                            z > z_max ? z_max : (z < z_min ? z_min : z),
+                            w > w_max ? w_max : (w < w_min ? w_min : w));
+            }
+            INLINE quat Clamp(quat min, quat max)
+            {
+                return quat(    x > max.x ? max.x : (x < min.x ? min.x : x),
+                                y > max.y ? max.y : (y < min.y ? min.y : y),
+                                z > max.z ? max.z : (z < min.z ? min.z : z),
+                                w > max.w ? max.w : (w < min.w ? min.w : w));
+            }
+            INLINE f32 Mag() const
+            {
+                return sqrtf(x * x + y * y + z * z + w * w);
+            }
+            INLINE f32 InvMag() const
+            {
+                return 1.0f / sqrtf(x * x + y * y + z * z + w * w);
+            }
+            INLINE f32 SqrMag() const
+            {
+                return x * x + y * y + z * z + w * w;
+            }
+            INLINE f32 Dot(quat_ref v) const
+            {
+                return x * v.x + y * v.y + z * v.z + w * v.w;
+            }
+            INLINE f32 Dist(quat_ref from) const
+            {
+                return sqrtf((x - from.x) * (x - from.x) +
+                            (y * from.y) * (y * from.y) +
+                            (z * from.z) * (z * from.z) +
+                            (w * from.w) * (w * from.w));
+            }
+            INLINE f32 SqrDist(quat_ref from) const
+            {
+                return  (x - from.x) * (x - from.x) +
+                        (y * from.y) * (y * from.y) +
+                        (z * from.z) * (z * from.z) +
+                        (w * from.w) * (w * from.w);
+            }
+            INLINE quat Norm() const
+            {
+                f32 inv_mag = InvMag();
+                return inv_mag > F32_EPSILON ? quat(x * inv_mag, y * inv_mag, z * inv_mag, inv_mag) : *this;
+            }
+        };
+
+        INLINE static bool operator ==(quat_ref lhs, quat_ref rhs)
+        {
+            return  lhs.x == rhs.x &&
+                    lhs.y == rhs.y &&
+                    lhs.z == rhs.z &&
+                    lhs.w == rhs.w;
+        }
+        INLINE static bool operator !=(quat_ref lhs, quat_ref rhs)
+        {
+            return !(lhs == rhs);
+        }
+
+        INLINE static quat operator +(quat_ref lhs, quat_ref rhs)
+        {
+            return quat(lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z, lhs.w + rhs.w);
+        }
+        INLINE static quat operator -(quat_ref lhs, quat_ref rhs)
+        {
+            return quat(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z, lhs.w - rhs.w);
+        }
+        INLINE static quat operator *(quat_ref lhs, f32_ref rhs)
+        {
+            return quat(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs, lhs.w  * rhs);
+        }
+        INLINE static quat operator /(quat_ref lhs, f32_ref rhs)
+        {
+            f32 inv = 1.0f / rhs;
+            return quat(lhs.x * inv, lhs.y * inv, lhs.z * inv, lhs.w * inv);
+        }
+
+        quat QUAT_IDENTITY = quat(1.0f);
+        quat QUAT_ZERO = quat(0.0f);
     }
-
     namespace collections
     {
         namespace lists
@@ -1395,5 +1720,4 @@ int main()
     using namespace rac::string;
     using namespace rac::mth;
     using namespace rac::io;
-
 }
